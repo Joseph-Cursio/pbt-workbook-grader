@@ -118,7 +118,7 @@ public struct Grade {
             return "true but weak — detected \(detected.count) of \(defectsTotal); "
                  + "\(undetected.count) \(unit) undetected"
         case .characterizing:
-            return "characterizing — detected all \(defectsTotal); none went undetected"
+            return "characterizing — every defect detected; none went undetected"
         }
     }
 
