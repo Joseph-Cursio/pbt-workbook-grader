@@ -2,16 +2,16 @@
 //
 //  This is deliberately NOT built on `propertyCheck`: that function is bound to
 //  Swift Testing (it requires a live test case and reports via `Issue.record`).
-//  A grader must *count* kills and *return* a result, so it drives generators
-//  itself through the `InputSource` contract.
+//  A grader must *count* detections and *return* a result, so it drives
+//  generators itself through the `InputSource` contract.
 
 extension Corpus {
     /// Grade a property against this corpus.
     ///
     /// The same `count` inputs are drawn once and reused across the reference
-    /// and every mutant, so the comparison is fair and — given a seeded source
-    /// — reproducible. A mutant is *killed* the first time the property fails on
-    /// it; the reference is expected to survive all inputs.
+    /// and every defect, so the comparison is fair and — given a seeded source
+    /// — reproducible. A defect is *detected* the first time the property fails
+    /// on it; the reference is expected to hold over all inputs.
     public func grade<Input, Source: InputSource>(
         with property: Property<Input, Subject>,
         drawing source: inout Source,
@@ -32,20 +32,20 @@ extension Corpus {
             break
         }
 
-        var killed: [KilledMutant] = []
-        var survivors: [Survivor] = []
-        for mutant in mutants {
-            var killer: String?
-            for input in inputs where !property.holds(input, mutant.subject) {
-                killer = String(describing: input)
+        var detected: [DetectedDefect] = []
+        var undetected: [UndetectedDefect] = []
+        for defect in defects {
+            var trigger: String?
+            for input in inputs where !property.holds(input, defect.subject) {
+                trigger = String(describing: input)
                 break
             }
-            if let killer {
-                killed.append(KilledMutant(id: mutant.id,
-                                           explanation: mutant.explanation,
-                                           counterexample: killer))
+            if let trigger {
+                detected.append(DetectedDefect(id: defect.id,
+                                               explanation: defect.explanation,
+                                               counterexample: trigger))
             } else {
-                survivors.append(Survivor(id: mutant.id, explanation: mutant.explanation))
+                undetected.append(UndetectedDefect(id: defect.id, explanation: defect.explanation))
             }
         }
 
@@ -53,8 +53,8 @@ extension Corpus {
                      propertyName: property.name,
                      referenceHeld: referenceHeld,
                      referenceCounterexample: referenceCounterexample,
-                     killed: killed,
-                     survivors: survivors,
+                     detected: detected,
+                     undetected: undetected,
                      sampleCount: inputs.count)
     }
 }

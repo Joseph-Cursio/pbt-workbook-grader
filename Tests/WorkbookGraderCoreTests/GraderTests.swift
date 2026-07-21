@@ -27,16 +27,16 @@ struct GraderTests {
         Corpus(
             name: "double",
             reference: Doubler { $0 * 2 },
-            mutants: [
-                Mutant(id: "off-by-one", explanation: "returns 2x+1",
+            defects: [
+                Defect(id: "off-by-one", explanation: "returns 2x+1",
                        subject: Doubler { $0 * 2 + 1 }),
-                Mutant(id: "identity", explanation: "returns x",
+                Defect(id: "identity", explanation: "returns x",
                        subject: Doubler { $0 })
             ]
         )
     }
 
-    @Test("a correct property kills every mutant and passes")
+    @Test("a correct property detects every defect and passes")
     func correctPropertyPasses() {
         let corpus = doublingCorpus()
         let property = Property<Int, Doubler>("f(x) == x + x") { input, subject in
@@ -46,24 +46,24 @@ struct GraderTests {
         let grade = corpus.grade(with: property, drawing: &source, count: 20)
 
         #expect(grade.referenceHeld)
-        #expect(grade.survivors.isEmpty)
-        #expect(grade.killed.count == 2)
+        #expect(grade.undetected.isEmpty)
+        #expect(grade.detected.count == 2)
         #expect(grade.passed)
-        #expect(grade.score == 1.0)
+        #expect(grade.detectionRate == 1.0)
     }
 
-    @Test("a non-refutable property leaves every mutant alive")
-    func trivialPropertyLeavesSurvivors() {
+    @Test("a non-refutable property leaves every defect undetected")
+    func trivialPropertyLeavesDefectsUndetected() {
         let corpus = doublingCorpus()
         let property = Property<Int, Doubler>("true") { _, _ in true }
         var source = ListSource(values: [1, 2, 3])
         let grade = corpus.grade(with: property, drawing: &source, count: 10)
 
         #expect(grade.referenceHeld)
-        #expect(grade.killed.isEmpty)
-        #expect(grade.survivors.count == 2)
+        #expect(grade.detected.isEmpty)
+        #expect(grade.undetected.count == 2)
         #expect(!grade.passed)
-        #expect(grade.score == 0.0)
+        #expect(grade.detectionRate == 0.0)
     }
 
     @Test("an over-strong property is reported against the reference, not passed")
@@ -87,16 +87,16 @@ struct GraderTests {
         let corpus = doublingCorpus()
         var source = ListSource(values: [1, 2, 3])
 
-        // Characterizing — kills the whole corpus.
+        // Characterizing — detects the whole corpus.
         let full = Property<Int, Doubler>("f(x) == 2x") { $1.apply($0) == $0 * 2 }
         #expect(corpus.grade(with: full, drawing: &source, count: 9).strength == .characterizing)
 
-        // Non-refutable — holds, kills nothing.
+        // Non-refutable — holds, detects nothing.
         var trivialSource = ListSource(values: [1, 2, 3])
         let trivial = Property<Int, Doubler>("true") { _, _ in true }
         #expect(corpus.grade(with: trivial, drawing: &trivialSource, count: 9).strength == .nonRefutable)
 
-        // Weak — kills the identity mutant (result != input) but not off-by-one.
+        // Weak — detects the identity defect (result != input) but not off-by-one.
         var weakSource = ListSource(values: [1, 2, 3])
         let weak = Property<Int, Doubler>("f(x) != x") { $1.apply($0) != $0 }
         let weakGrade = corpus.grade(with: weak, drawing: &weakSource, count: 9)
@@ -109,14 +109,14 @@ struct GraderTests {
         #expect(corpus.grade(with: overStrong, drawing: &overStrongSource, count: 9).strength == .overStrong)
     }
 
-    @Test("killed mutants carry a reproducing counterexample")
-    func killsRecordCounterexample() {
+    @Test("detected defects carry a reproducing counterexample")
+    func detectionsRecordCounterexample() {
         let corpus = doublingCorpus()
         let property = Property<Int, Doubler>("f(x) == 2x") { input, subject in
             subject.apply(input) == input * 2
         }
         var source = ListSource(values: [7])
         let grade = corpus.grade(with: property, drawing: &source, count: 3)
-        #expect(grade.killed.allSatisfy { $0.counterexample == "7" })
+        #expect(grade.detected.allSatisfy { $0.counterexample == "7" })
     }
 }
