@@ -34,3 +34,10 @@ can be public (per the book's `workbook-repo-topology.md`).
 
 Both depend on this package, pinned by version, so the grader has one source of
 truth. The engine (`swift-property-based`, 1.2.x) is pinned here and inherited.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE). This package is infrastructure: the runner, the
+schema, and the scoring. It carries no defect corpora, so it stays public and
+permissively licensed, and the public sampler that depends on it is usable end
+to end.
