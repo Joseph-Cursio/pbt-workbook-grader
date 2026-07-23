@@ -19,16 +19,32 @@ public struct SwiftInputSource<Value, Shrink: SendableSequenceType>: InputSource
     public static var defaultSeed: UInt64 { 0xB00C_5EED_1DEA_0FF5 }
 
     private let generator: Generator<Value, Shrink>
+    private let shrinker: (Value) -> [Value]
     private var rng: Xoshiro
 
+    /// - Parameter shrink: how to simplify a failing input before showing it to
+    ///   the reader. Defaults to no shrinking, which reports the first failure
+    ///   as-is. Pass one of `Shrinkers`' strategies to get minimal
+    ///   counterexamples — see `Shrinkers.array` / `Shrinkers.integer`.
+    ///
+    ///   The engine has its own shrinker, but it is `internal` and driven only by
+    ///   `propertyCheck`, which reports through Swift Testing rather than
+    ///   returning a result. A grader has to *return* a counterexample, so it
+    ///   reduces the input itself through the Core contract.
     public init(_ generator: Generator<Value, Shrink>,
-                seed: UInt64 = SwiftInputSource.defaultSeed) {
+                seed: UInt64 = SwiftInputSource.defaultSeed,
+                shrink: @escaping (Value) -> [Value] = { _ in [] }) {
         self.generator = generator
+        self.shrinker = shrink
         self.rng = Xoshiro(seed: Self.expand(seed))
     }
 
     public mutating func next() -> Value {
         generator.run(using: &rng)
+    }
+
+    public func shrinkCandidates(from input: Value) -> [Value] {
+        shrinker(input)
     }
 
     /// Disperse a single seed into Xoshiro's 4-word state with SplitMix64, so a
@@ -54,9 +70,10 @@ extension Corpus {
         with property: Property<Value, Subject>,
         using generator: Generator<Value, Shrink>,
         count: Int = 200,
-        seed: UInt64 = SwiftInputSource<Value, Shrink>.defaultSeed
+        seed: UInt64 = SwiftInputSource<Value, Shrink>.defaultSeed,
+        shrink: @escaping (Value) -> [Value] = { _ in [] }
     ) -> Grade {
-        var source = SwiftInputSource(generator, seed: seed)
+        var source = SwiftInputSource(generator, seed: seed, shrink: shrink)
         return grade(with: property, drawing: &source, count: count)
     }
 }
