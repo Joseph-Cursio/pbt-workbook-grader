@@ -40,5 +40,12 @@ let package = Package(
                 .product(name: "PropertyBased", package: "swift-property-based"),
             ]
         ),
+        // The binding's own tests. Unlike WorkbookGraderCoreTests these need the
+        // engine, because half of what they measure is what a *sampled* source
+        // does that a walked one does not.
+        .testTarget(
+            name: "WorkbookGraderSwiftTests",
+            dependencies: ["WorkbookGraderSwift"]
+        ),
     ]
 )
