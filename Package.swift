@@ -15,7 +15,7 @@ import PackageDescription
 //   • WorkbookGraderCore  — the language-neutral contract (no engine).
 //   • WorkbookGraderSwift — the swift-property-based binding.
 //
-// Engine pinned to 1.2.x, inherited by every consumer.
+// Engine pinned to 2.x, inherited by every consumer.
 let package = Package(
     name: "pbt-workbook-grader",
     platforms: [.macOS(.v14)],
@@ -25,7 +25,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/x-sheep/swift-property-based.git",
-                 .upToNextMinor(from: "1.2.0")),
+                 from: "2.0.0"),
     ],
     targets: [
         .target(name: "WorkbookGraderCore"),
