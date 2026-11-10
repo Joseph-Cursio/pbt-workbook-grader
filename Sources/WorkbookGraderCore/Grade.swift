@@ -8,11 +8,14 @@
 
 /// A defect your property caught, with the input that exposed it.
 public struct DetectedDefect {
+    /// The defect's stable identifier, e.g. `"rle.drops-singletons"`.
     public let id: String
+    /// One line describing the injected bug.
     public let explanation: String
     /// A rendering of the falsifying input — the reproduction the reader reads.
     public let counterexample: String
 
+    /// A detection record for one defect and the input that exposed it.
     public init(id: String, explanation: String, counterexample: String) {
         self.id = id
         self.explanation = explanation
@@ -22,17 +25,24 @@ public struct DetectedDefect {
 
 /// A defect your property missed — the teaching moment.
 public struct UndetectedDefect {
+    /// The defect's stable identifier, e.g. `"rle.drops-singletons"`.
     public let id: String
+    /// One line describing the injected bug — the "why" the reader is shown.
     public let explanation: String
 
+    /// A record of one defect the property missed.
     public init(id: String, explanation: String) {
         self.id = id
         self.explanation = explanation
     }
 }
 
+/// The outcome of grading one property against one corpus: whether it held on
+/// the reference, and which defects it detected and missed.
 public struct Grade {
+    /// The name of the corpus that was graded against.
     public let corpusName: String
+    /// The name of the reader's property.
     public let propertyName: String
 
     /// Did the property hold on the *correct* implementation? A `false` here
@@ -42,17 +52,23 @@ public struct Grade {
     /// If the reference failed, the input that broke it.
     public let referenceCounterexample: String?
 
+    /// The defects the property broke on, each with its counterexample.
     public let detected: [DetectedDefect]
+    /// The defects the property held on, so would still ship.
     public let undetected: [UndetectedDefect]
+    /// How many inputs were drawn and tried against every subject.
     public let sampleCount: Int
 
-    public init(corpusName: String,
-                propertyName: String,
-                referenceHeld: Bool,
-                referenceCounterexample: String?,
-                detected: [DetectedDefect],
-                undetected: [UndetectedDefect],
-                sampleCount: Int) {
+    /// A grade assembled from the runner's results.
+    public init(
+        corpusName: String,
+        propertyName: String,
+        referenceHeld: Bool,
+        referenceCounterexample: String?,
+        detected: [DetectedDefect],
+        undetected: [UndetectedDefect],
+        sampleCount: Int
+    ) {
         self.corpusName = corpusName
         self.propertyName = propertyName
         self.referenceHeld = referenceHeld
@@ -62,6 +78,7 @@ public struct Grade {
         self.sampleCount = sampleCount
     }
 
+    /// The number of defects in the corpus, detected or not.
     public var defectsTotal: Int { detected.count + undetected.count }
 
     /// Detection rate in `0...1`. An empty corpus rates 1 (nothing to detect)
@@ -96,6 +113,7 @@ public struct Grade {
         case characterizing
     }
 
+    /// This grade's place on the strength ratchet.
     public var strength: Strength {
         if !referenceHeld { return .overStrong }
         if defectsTotal == 0 { return .noDefects }
@@ -109,14 +127,18 @@ public struct Grade {
         switch strength {
         case .overStrong:
             return "over-strong — it rejects correct code"
+
         case .noDefects:
             return "no defects here — nothing to distinguish (an honest-silence rep)"
+
         case .nonRefutable:
             return "not yet refutable — it holds, but detects nothing"
+
         case .weak:
             let unit = undetected.count == 1 ? "defect" : "defects"
             return "true but weak — detected \(detected.count) of \(defectsTotal); "
                  + "\(undetected.count) \(unit) undetected"
+
         case .characterizing:
             return "characterizing — every defect detected; none went undetected"
         }

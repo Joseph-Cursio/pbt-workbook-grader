@@ -16,8 +16,8 @@
 //  against the whole space so they cannot drift, and the one test that touches
 //  sampling asserts only that the outcome *varies with the seed*, never a rate.
 
-import Testing
 import PropertyBased
+import Testing
 @testable import WorkbookGraderSwift
 
 // MARK: - A corpus in the shape of a workbook exercise
@@ -29,9 +29,9 @@ private struct Codec {
     let decode: ([Run]) -> [Int]
 }
 
-private func correctEncode(_ xs: [Int]) -> [Run] {
+private func correctEncode(_ values: [Int]) -> [Run] {
     var out: [Run] = []
-    for x in xs {
+    for x in values {
         if let last = out.last, last.value == x {
             out[out.count - 1] = Run(value: x, count: last.count + 1)
         } else {
@@ -52,34 +52,40 @@ private func rleCorpus() -> Corpus<Codec> {
         name: "run-length encoding",
         reference: Codec(encode: correctEncode, decode: correctDecode),
         defects: [
-            Defect(id: "rle.drops-trailing-singleton",
-                   explanation: "a final run of length 1 is dropped by the encoder",
-                   subject: Codec(encode: { xs in
-                       var runs = correctEncode(xs)
-                       if let last = runs.last, last.count == 1 { runs.removeLast() }
-                       return runs
-                   }, decode: correctDecode)),
-            Defect(id: "rle.miscounts-run-of-three",
-                   explanation: "a run of exactly 3 encodes as a count of 2",
-                   subject: Codec(encode: { xs in
-                       correctEncode(xs).map {
-                           $0.count == 3 ? Run(value: $0.value, count: 2) : $0
-                       }
-                   }, decode: correctDecode)),
-            Defect(id: "rle.miscounts-run-of-five",
-                   explanation: "a run of exactly 5 encodes as a count of 4",
-                   subject: Codec(encode: { xs in
-                       correctEncode(xs).map {
-                           $0.count == 5 ? Run(value: $0.value, count: 4) : $0
-                       }
-                   }, decode: correctDecode)),
+            Defect(
+                id: "rle.drops-trailing-singleton",
+                explanation: "a final run of length 1 is dropped by the encoder",
+                subject: Codec(encode: { values in
+                    var runs = correctEncode(values)
+                    if let last = runs.last, last.count == 1 { runs.removeLast() }
+                    return runs
+                }, decode: correctDecode)
+            ),
+            Defect(
+                id: "rle.miscounts-run-of-three",
+                explanation: "a run of exactly 3 encodes as a count of 2",
+                subject: Codec(encode: { values in
+                    correctEncode(values).map {
+                        $0.count == 3 ? Run(value: $0.value, count: 2) : $0
+                    }
+                }, decode: correctDecode)
+            ),
+            Defect(
+                id: "rle.miscounts-run-of-five",
+                explanation: "a run of exactly 5 encodes as a count of 4",
+                subject: Codec(encode: { values in
+                    correctEncode(values).map {
+                        $0.count == 5 ? Run(value: $0.value, count: 4) : $0
+                    }
+                }, decode: correctDecode)
+            ),
         ]
     )
 }
 
 private func roundTrip() -> Property<[Int], Codec> {
-    Property("decode(encode(xs)) == xs") { xs, codec in
-        codec.decode(codec.encode(xs)) == xs
+    Property("decode(encode(xs)) == xs") { values, codec in
+        codec.decode(codec.encode(values)) == values
     }
 }
 
@@ -139,19 +145,19 @@ struct WalkedSpaceTests {
         Gen.int(in: 0...2).array(of: 0...6)
     }
 
-    private var space: [[Int]] { everyArray(alphabet: 3, maxLength: 6) }
+    private var wholeSpace: [[Int]] { everyArray(alphabet: 3, maxLength: 6) }
 
     @Test("the space is 1093 cases, ordered smallest-first")
     func theSpaceIsOrderedSmallestFirst() {
-        let space = space
+        let space = wholeSpace
         #expect(space.count == 1_093)          // 3^0 + 3^1 + ... + 3^6
-        #expect(space.first == [])
+        #expect(space.first?.isEmpty == true)
         #expect(space.map(\.count) == space.map(\.count).sorted())
     }
 
     @Test("defect densities, brute-forced over the whole space so they cannot drift")
     func defectDensitiesArePinned() {
-        let space = space
+        let space = wholeSpace
         let property = roundTrip()
         let triggers = rleCorpus().defects.map { defect in
             space.filter { !property.holds($0, defect.subject) }.count
@@ -177,8 +183,10 @@ struct WalkedSpaceTests {
         var missing: [UInt64] = []
 
         for seed in UInt64(0)..<200 {
-            let grade = corpus.grade(with: property, using: sampledGenerator,
-                                     count: 200, seed: seed)
+            let grade = corpus.grade(
+                with: property, using: sampledGenerator,
+                count: 200, seed: seed
+            )
             if grade.undetected.contains(where: { $0.id == "rle.miscounts-run-of-five" }) {
                 missing.append(seed)
             } else {
@@ -196,7 +204,7 @@ struct WalkedSpaceTests {
     @Test("a walked prefix detects every defect on the sampled budget")
     func aWalkedPrefixDetectsEveryDefectAtTheSameBudget() {
         let corpus = rleCorpus()
-        var source = WalkedSource(cases: Array(space.prefix(200)))
+        var source = WalkedSource(cases: Array(wholeSpace.prefix(200)))
         let grade = corpus.grade(with: roundTrip(), drawing: &source, count: 200)
 
         #expect(grade.referenceHeld)
@@ -207,7 +215,7 @@ struct WalkedSpaceTests {
     @Test("the full walk detects every defect")
     func theFullWalkDetectsEveryDefect() {
         let corpus = rleCorpus()
-        let space = space
+        let space = wholeSpace
         var source = WalkedSource(cases: space)
         let grade = corpus.grade(with: roundTrip(), drawing: &source, count: space.count)
 
@@ -222,14 +230,14 @@ struct WalkedSpaceTests {
     /// the *smallest* failing case is a consequence of the ordering, checked
     /// here against a brute-force minimum rather than asserted.
     @Test("the first walked failure is the smallest failing case in the space")
-    func theFirstWalkedFailureIsTheSmallestOneInTheSpace() {
-        let space = space
+    func theFirstWalkedFailureIsTheSmallestOneInTheSpace() throws {
+        let space = wholeSpace
         let property = roundTrip()
 
         for defect in rleCorpus().defects {
             let failing = space.filter { !property.holds($0, defect.subject) }
-            let firstWalked = try! #require(failing.first)
-            let smallest = try! #require(failing.map(\.count).min())
+            let firstWalked = try #require(failing.first)
+            let smallest = try #require(failing.map(\.count).min())
             #expect(firstWalked.count == smallest,
                     "\(defect.id): walk reported \(firstWalked), but a length-\(smallest) case also fails")
         }
@@ -252,12 +260,16 @@ struct WalkedSpaceTests {
     /// this test is expected to change when it does.
     @Test("sampleCount is a draw count, not a coverage denominator")
     func sampleCountIsADrawCountNotACoverageDenominator() {
-        let space = space
+        let space = wholeSpace
         var walked = WalkedSource(cases: space)
-        let walkedGrade = rleCorpus().grade(with: roundTrip(), drawing: &walked,
-                                            count: space.count)
-        let sampledGrade = rleCorpus().grade(with: roundTrip(), using: sampledGenerator,
-                                             count: space.count, seed: 0)
+        let walkedGrade = rleCorpus().grade(
+            with: roundTrip(), drawing: &walked,
+            count: space.count
+        )
+        let sampledGrade = rleCorpus().grade(
+            with: roundTrip(), using: sampledGenerator,
+            count: space.count, seed: 0
+        )
 
         #expect(walkedGrade.sampleCount == sampledGrade.sampleCount)
         #expect(walkedGrade.sampleCount == 1_093)

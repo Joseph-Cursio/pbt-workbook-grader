@@ -1,8 +1,9 @@
-//  SwiftBinding.swift — Layer 2. Binds the language-neutral contract to the
+//  SwiftInputSource.swift — Layer 2. Binds the language-neutral contract to the
 //  `swift-property-based` engine, and nothing more.
 //
-//  This is the only file a Swift port would throw away. `WorkbookGraderCore`
-//  (the pedagogy) stays; a fast-check port writes its own binding here.
+//  This file and Corpus+SwiftGrading.swift are the only ones a Swift port would
+//  throw away. `WorkbookGraderCore` (the pedagogy) stays; a fast-check port
+//  writes its own binding here.
 
 import PropertyBased
 // Re-export the contract so downstream code imports one module and writes
@@ -31,26 +32,30 @@ public struct SwiftInputSource<Value, Shrink: SendableSequenceType>: InputSource
     ///   `propertyCheck`, which reports through Swift Testing rather than
     ///   returning a result. A grader has to *return* a counterexample, so it
     ///   reduces the input itself through the Core contract.
-    public init(_ generator: Generator<Value, Shrink>,
-                seed: UInt64 = SwiftInputSource.defaultSeed,
-                shrink: @escaping (Value) -> [Value] = { _ in [] }) {
+    public init(
+        _ generator: Generator<Value, Shrink>,
+        seed: UInt64 = Self.defaultSeed,
+        shrink: @escaping (Value) -> [Value] = { _ in [] }
+    ) {
         self.generator = generator
         self.shrinker = shrink
-        self.rng = Xoshiro(seed: Self.expand(seed))
+        self.rng = Self.seededRNG(seed)
     }
 
+    /// Draws the next input from the generator, advancing the seeded RNG.
     public mutating func next() -> Value {
         generator.run(using: &rng)
     }
 
+    /// Simpler inputs for a failing one, from the `shrink` strategy given at init.
     public func shrinkCandidates(from input: Value) -> [Value] {
         shrinker(input)
     }
 
-    /// Disperse a single seed into Xoshiro's 4-word state with SplitMix64, so a
-    /// small seed like `1` still gives a well-mixed starting state (a mostly-zero
-    /// tuple would generate poorly).
-    private static func expand(_ seed: UInt64) -> (UInt64, UInt64, UInt64, UInt64) {
+    /// A Xoshiro seeded from a single word: SplitMix64 disperses the seed into
+    /// Xoshiro's 4-word state, so a small seed like `1` still gives a well-mixed
+    /// starting state (a mostly-zero tuple would generate poorly).
+    private static func seededRNG(_ seed: UInt64) -> Xoshiro {
         var state = seed
         func nextWord() -> UInt64 {
             state = state &+ 0x9E37_79B9_7F4A_7C15
@@ -59,21 +64,6 @@ public struct SwiftInputSource<Value, Shrink: SendableSequenceType>: InputSource
             mixed = (mixed ^ (mixed >> 27)) &* 0x94D0_49BB_1331_11EB
             return mixed ^ (mixed >> 31)
         }
-        return (nextWord(), nextWord(), nextWord(), nextWord())
-    }
-}
-
-extension Corpus {
-    /// Grade a property against this corpus using an engine generator — the
-    /// convenience the reader-facing loop calls. Deterministic given the seed.
-    public func grade<Value, Shrink: SendableSequenceType>(
-        with property: Property<Value, Subject>,
-        using generator: Generator<Value, Shrink>,
-        count: Int = 200,
-        seed: UInt64 = SwiftInputSource<Value, Shrink>.defaultSeed,
-        shrink: @escaping (Value) -> [Value] = { _ in [] }
-    ) -> Grade {
-        var source = SwiftInputSource(generator, seed: seed, shrink: shrink)
-        return grade(with: property, drawing: &source, count: count)
+        return Xoshiro(seed: (nextWord(), nextWord(), nextWord(), nextWord()))
     }
 }

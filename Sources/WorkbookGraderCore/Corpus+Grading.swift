@@ -1,4 +1,4 @@
-//  Grader.swift — the runner. Language-neutral; no engine, no test framework.
+//  Corpus+Grading.swift — the runner. Language-neutral; no engine, no test framework.
 //
 //  This is deliberately NOT built on `propertyCheck`: that function is bound to
 //  Swift Testing (it requires a live test case and reports via `Issue.record`).
@@ -49,21 +49,25 @@ extension Corpus {
                 let minimal = Self.reduce(trigger, using: source) {
                     !property.holds($0, defect.subject)
                 }
-                detected.append(DetectedDefect(id: defect.id,
-                                               explanation: defect.explanation,
-                                               counterexample: String(describing: minimal)))
+                detected.append(DetectedDefect(
+                    id: defect.id,
+                    explanation: defect.explanation,
+                    counterexample: String(describing: minimal)
+                ))
             } else {
                 undetected.append(UndetectedDefect(id: defect.id, explanation: defect.explanation))
             }
         }
 
-        return Grade(corpusName: name,
-                     propertyName: property.name,
-                     referenceHeld: referenceHeld,
-                     referenceCounterexample: referenceCounterexample,
-                     detected: detected,
-                     undetected: undetected,
-                     sampleCount: inputs.count)
+        return Grade(
+            corpusName: name,
+            propertyName: property.name,
+            referenceHeld: referenceHeld,
+            referenceCounterexample: referenceCounterexample,
+            detected: detected,
+            undetected: undetected,
+            sampleCount: inputs.count
+        )
     }
 
     /// Reduce a failing input to the simplest one that still fails.
